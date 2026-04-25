@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Edit Admin{% endblock %}
+{% block topbar %}
+<div class="topbar"><a href="/admin/admins" class="t-back">Back</a><span class="t-title" style="text-align:center">Edit Admin</span><span class="role-pill rp-admin">Admin</span></div>
+{% endblock %}
+{% block content %}
+<div class="fp">
+  <div class="ib ib-info" style="margin-bottom:var(--sp4)">
+    <span class="ib-ico">i</span>
+    <span>Editing <strong>{{ admin_user.username }}</strong>. Leave password blank to keep the current password.</span>
+  </div>
+
+  <form id="adminForm" method="POST" action="/admin/admins/{{ admin_user.admin_id }}/edit" onsubmit="return vForm('adminForm')">
+    <div class="fc">
+      <div class="fs">Account details</div>
+      <div class="fld-row">
+        <div class="fld">
+          <div class="lbl">Username <span class="req">*</span></div>
+          <input class="inp" type="text" name="username" id="username"
+                 value="{{ form.get('username', admin_user.username) }}" data-rule="required" minlength="3" required>
+          <span class="ferr" id="username_err"></span>
+        </div>
+        <div class="fld">
+          <div class="lbl">Role <span class="req">*</span></div>
+          <div class="sw">
+            <select class="sel" name="role" required>
+              <option value="admin" {% if form.get('role', admin_user.role) == 'admin' %}selected{% endif %}>Admin</option>
+              <option value="superadmin" {% if form.get('role', admin_user.role) == 'superadmin' %}selected{% endif %}>Superadmin</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="fld">
+        <div class="lbl">Email Address <span class="req">*</span></div>
+        <input class="inp" type="email" name="email" id="email"
+               value="{{ form.get('email', admin_user.email) }}" data-rule="email" required>
+        <span class="ferr" id="email_err"></span>
+      </div>
+    </div>
+
+    <div class="fc">
+      <div class="fs">Password</div>
+      <div class="fld-row">
+        <div class="fld">
+          <div class="lbl">New Password</div>
+          <div class="pw">
+            <input class="inp" type="password" name="password" id="password" data-rule="pw" placeholder="Leave blank to keep current">
+            <button type="button" class="pw-btn" onclick="togglePw('password',this)">Show</button>
+          </div>
+          <span class="ferr" id="password_err"></span>
+        </div>
+        <div class="fld">
+          <div class="lbl">Confirm Password</div>
+          <div class="pw">
+            <input class="inp" type="password" name="confirm_password" id="confirm_password" placeholder="Repeat new password">
+            <button type="button" class="pw-btn" onclick="togglePw('confirm_password',this)">Show</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bgrp" style="margin-top:4px">
+      <a href="/admin/admins" class="btn btn-ghost">Cancel</a>
+      <button class="btn btn-primary" type="submit" style="flex:2">Save Changes</button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.getElementById('adminForm').addEventListener('submit', function(e) {
+  const pw = document.getElementById('password').value;
+  const cp = document.getElementById('confirm_password').value;
+  if (pw && pw !== cp) {
+    e.preventDefault();
+    toast('Passwords do not match.', 'var(--red)');
+  }
+});
+</script>
+{% endblock %}

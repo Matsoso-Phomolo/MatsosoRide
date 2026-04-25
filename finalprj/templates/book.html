@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Book a Ride{% endblock %}
+{% block topbar %}
+<div class="topbar">
+  <a href="/" class="t-back">← Home</a>
+  <span class="t-title" style="text-align:center">Book a Ride</span>
+  <span class="role-pill rp-public">Public</span>
+</div>
+{% endblock %}
+{% block content %}
+<div class="fp">
+  <div class="ph" style="padding-left:0;padding-right:0">
+    <h1>Where to?</h1>
+  </div>
+
+  <!-- Fixed rate card -->
+  <div class="fc" style="margin-bottom:var(--sp3)">
+    <div class="fs">Fixed fare rates</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+      <div style="background:var(--s2);border-radius:10px;padding:10px 6px;border:1px solid var(--bd)">
+        <div style="font-size:18px;font-weight:800;color:var(--brand)">M 80</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">CBD<br>to CBD</div>
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:10px 6px;border:1px solid var(--bd)">
+        <div style="font-size:18px;font-weight:800;color:var(--brand)">M 120</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">CBD ↔<br>MSU Local</div>
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:10px 6px;border:1px solid var(--bd)">
+        <div style="font-size:18px;font-weight:800;color:var(--brand)">M 150</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">MSU Local<br>to MSU Local</div>
+      </div>
+    </div>
+  </div>
+
+  <form id="bookForm" method="POST" action="/book" onsubmit="return validateBooking()">
+
+    <!-- Passenger details -->
+    <div class="fc">
+      <div class="fs">Your details</div>
+      <div class="fld">
+        <div class="lbl">Your Name <span class="req">*</span></div>
+        <input class="inp" type="text" name="passenger_name" id="passenger_name"
+               placeholder="e.g. Thabo Molefe"
+               value="{{ form.get('passenger_name','') }}"
+               data-rule="name" data-mask="name" required>
+        <span class="ferr" id="passenger_name_err"></span>
+      </div>
+      <div class="fld">
+        <div class="lbl">Phone Number <span class="req">*</span>
+          <span class="lhint">Driver will call this number</span>
+        </div>
+        <div class="iw">
+          <span class="ico">📱</span>
+          <input class="inp mono" type="tel" name="passenger_phone" id="passenger_phone"
+                 placeholder="+26657 000 000"
+                 value="{{ form.get('passenger_phone','') }}"
+                 data-rule="phone" data-mask="phone" required>
+        </div>
+        <span class="ferr" id="passenger_phone_err"></span>
+        <span class="fok" id="passenger_phone_ok">✓ Valid phone number</span>
+      </div>
+    </div>
+
+    <!-- Route -->
+    <div class="fc">
+      <div class="fs">Route</div>
+      <div class="fld">
+        <div class="lbl">📍 Pickup Location <span class="req">*</span></div>
+        <div class="sw">
+          <select class="sel" name="pickup" id="pickup" required onchange="updateFare()">
+            <option value="">— Select pickup location —</option>
+            <optgroup label="🏙 Maseru CBD">
+              {% for loc in locations if loc.area_zone != 'MSU Local' %}
+              <option value="{{ loc.location_id }}"
+                {% if form.get('pickup','')|string == loc.location_id|string %}selected{% endif %}>
+                {{ loc.location_name }}{% if loc.area_zone != 'CBD' %} ({{ loc.area_zone }}){% endif %}
+              </option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🏘 MSU Local Villages">
+              {% for loc in locations if loc.area_zone == 'MSU Local' %}
+              <option value="{{ loc.location_id }}"
+                {% if form.get('pickup','')|string == loc.location_id|string %}selected{% endif %}>
+                {{ loc.location_name }}
+              </option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <span class="ferr" id="pickup_err"></span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;padding:2px 4px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="du"></div>
+          <div style="width:1px;height:14px;border-left:1px dashed var(--bd)"></div>
+          <div class="dd"></div>
+        </div>
+        <div style="font-size:11px;color:var(--tx3)">Maseru CBD &amp; MSU Local</div>
+      </div>
+
+      <div class="fld">
+        <div class="lbl">🏁 Destination <span class="req">*</span></div>
+        <div class="sw">
+          <select class="sel" name="dropoff" id="dropoff" required onchange="updateFare()">
+            <option value="">— Select destination —</option>
+            <optgroup label="🏙 Maseru CBD">
+              {% for loc in locations if loc.area_zone != 'MSU Local' %}
+              <option value="{{ loc.location_id }}"
+                {% if form.get('dropoff','')|string == loc.location_id|string %}selected{% endif %}>
+                {{ loc.location_name }}{% if loc.area_zone != 'CBD' %} ({{ loc.area_zone }}){% endif %}
+              </option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🏘 MSU Local Villages">
+              {% for loc in locations if loc.area_zone == 'MSU Local' %}
+              <option value="{{ loc.location_id }}"
+                {% if form.get('dropoff','')|string == loc.location_id|string %}selected{% endif %}>
+                {{ loc.location_name }}
+              </option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <span class="ferr" id="dropoff_err"></span>
+      </div>
+
+      <!-- Live fare preview box -->
+      <div id="fareBox" style="display:none;background:var(--s2);border:1.5px solid var(--brand-bd);border-radius:var(--r3);padding:14px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:10.5px;color:var(--tx3);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px">Your fare</div>
+            <div style="font-size:12px;color:var(--tx2)" id="fareRoute">—</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:30px;font-weight:800;color:var(--brand);line-height:1" id="fareAmt">—</div>
+            <div style="font-size:10px;color:var(--tx3);margin-top:2px">Fixed rate · Maloti</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)">
+          Pay this exact amount to the driver on completion.
+        </div>
+      </div>
+
+      <!-- Same location error -->
+      <div id="sameLoc" style="display:none">
+        <div class="ib ib-danger">
+          <span class="ib-ico">⚠️</span>
+          <span>Pickup and destination cannot be the same location.</span>
+        </div>
+      </div>
+
+      <!-- Fare error -->
+      <div id="fareErr" style="display:none">
+        <div class="ib ib-danger">
+          <span class="ib-ico">⚠️</span>
+          <span id="fareErrMsg">Unable to calculate fare for this route.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment -->
+    <div class="fc">
+      <div class="fs">Payment method <span class="req">*</span></div>
+      <div class="rg">
+        {% for pm in methods %}
+        <label class="rp {% if loop.first %}on{% endif %}">
+          <input type="radio" name="payment" value="{{ pm.payment_method_id }}"
+                 {% if loop.first %}checked{% elif form.get('payment','')|string == pm.payment_method_id|string %}checked{% endif %}>
+          {{ '💵' if 'Cash' in pm.method_name else '📱' if 'Mobile' in pm.method_name else '💳' }}
+          {{ pm.method_name }}
+        </label>
+        {% endfor %}
+      </div>
+      <div class="ib ib-brand">
+        <span class="ib-ico">ℹ️</span>
+        <span>Payment is made <strong>directly to the driver</strong> at the fixed rate shown above.</span>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="fc">
+      <div class="fs">Notes for driver
+        <span class="ctr" id="notes_ctr">0/120</span>
+      </div>
+      <textarea class="ta" name="notes" id="notes" maxlength="120"
+                placeholder="e.g. I'll be at the main entrance wearing a red jacket…">{{ form.get('notes','') }}</textarea>
+      <div class="fhint">Optional — helps the driver find you</div>
+    </div>
+
+    <button class="btn btn-primary btn-full btn-lg" type="submit" id="submitBtn">
+      Request Ride
+    </button>
+  </form>
+</div>
+
+<script>
+charCtr('notes','notes_ctr',120);
+
+/* Build a client-side location lookup so we can show zone labels in the fare box */
+const locData = {
+  {% for loc in locations %}
+  {{ loc.location_id }}: { name: {{ loc.location_name|tojson }}, zone: {{ loc.area_zone|tojson }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+const zoneLabel = { 'CBD': 'Maseru CBD', 'MSU Local': 'MSU Local' };
+function normZone(z) { return (z && z.startsWith('MSU')) ? 'MSU Local' : 'CBD'; }
+
+let fareValid = false;
+
+function updateFare() {
+  const pickup  = document.getElementById('pickup').value;
+  const dropoff = document.getElementById('dropoff').value;
+  const fareBox = document.getElementById('fareBox');
+  const fareErr = document.getElementById('fareErr');
+  const sameLoc = document.getElementById('sameLoc');
+  const submitBtn = document.getElementById('submitBtn');
+
+  fareBox.style.display = 'none';
+  fareErr.style.display = 'none';
+  sameLoc.style.display = 'none';
+  fareValid = false;
+
+  if (!pickup || !dropoff) { submitBtn.disabled = false; return; }
+
+  if (pickup === dropoff) {
+    sameLoc.style.display = 'block';
+    submitBtn.disabled = true;
+    return;
+  }
+
+  submitBtn.disabled = false;
+  fareBox.style.display = 'block';
+  document.getElementById('fareAmt').textContent = '…';
+  document.getElementById('fareRoute').textContent = 'Calculating…';
+
+  fetch('/api/fare?pickup=' + pickup + '&dropoff=' + dropoff)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.fare && data.fare !== 0) {
+        fareBox.style.display = 'none';
+        fareErr.style.display = 'block';
+        document.getElementById('fareErrMsg').textContent =
+          'No fare configured for this route. Please contact Urban Cab.';
+        return;
+      }
+      fareValid = true;
+      const pu = locData[pickup];
+      const dr = locData[dropoff];
+      const pz = zoneLabel[normZone(pu ? pu.zone : '')] || 'Zone';
+      const dz = zoneLabel[normZone(dr ? dr.zone : '')] || 'Zone';
+      document.getElementById('fareAmt').textContent  = 'M ' + data.fare.toFixed(2);
+      document.getElementById('fareRoute').textContent = pz + ' → ' + dz;
+    })
+    .catch(() => {
+      fareBox.style.display = 'none';
+      fareErr.style.display = 'block';
+      document.getElementById('fareErrMsg').textContent =
+        'Could not connect to fare service. Please try again.';
+    });
+}
+
+function validateBooking() {
+  const pickup  = document.getElementById('pickup').value;
+  const dropoff = document.getElementById('dropoff').value;
+  if (!pickup)            { toast('⚠ Please select a pickup location.', 'var(--red)'); return false; }
+  if (!dropoff)           { toast('⚠ Please select a destination.', 'var(--red)');    return false; }
+  if (pickup === dropoff) { toast('⚠ Pickup and destination cannot be the same.', 'var(--red)'); return false; }
+  return vForm('bookForm');
+}
+
+/* Trigger fare fetch on page load if locations were pre-filled after a validation error */
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('pickup').value && document.getElementById('dropoff').value) {
+    updateFare();
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block topbar %}
+<div class="topbar"><a href="/driver" class="t-back">← Back</a><span class="t-title" style="text-align:center">My Profile</span><span style="width:64px"></span></div>
+{% endblock %}
+{% block content %}
+<div class="fp">
+  <div class="phero" style="margin:0 0 var(--sp4)">
+    <div class="av" style="background:var(--green);width:52px;height:52px;font-size:20px">{{ d.first_name[0] }}</div>
+    <div>
+      <div style="font-size:16px;font-weight:700">{{ d.first_name }} {{ d.last_name }}</div>
+      <div style="font-size:11.5px;color:var(--tx3);margin-top:2px"><span class="mono">{{ d.vehicle_plate }}</span> · {{ d.vehicle_model or '—' }}</div>
+      <span style="font-size:10px;padding:2px 8px;border-radius:100px;margin-top:4px;display:inline-block;{% if d.is_available %}background:var(--green-bg);color:var(--green){% else %}background:var(--s2);color:var(--tx3){% endif %}">
+        {% if d.is_available %}🟢 Online{% else %}⚫ Offline{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <form id="profileForm" method="POST" action="/driver/profile" onsubmit="return vForm('profileForm')">
+    <div class="fc">
+      <div class="fs">Personal information</div>
+      <div class="fld-row">
+        <div class="fld">
+          <div class="lbl">First Name <span class="req">*</span></div>
+          <input class="inp" type="text" name="first_name" id="first_name" value="{{ d.first_name }}" data-rule="name" data-mask="name" required>
+          <span class="ferr" id="first_name_err"></span>
+        </div>
+        <div class="fld">
+          <div class="lbl">Last Name <span class="req">*</span></div>
+          <input class="inp" type="text" name="last_name" id="last_name" value="{{ d.last_name }}" data-rule="name" data-mask="name" required>
+          <span class="ferr" id="last_name_err"></span>
+        </div>
+      </div>
+      <div class="fld">
+        <div class="lbl">Phone</div>
+        <input class="inp mono" value="{{ d.phone_number }}" disabled>
+        <div class="fhint">Contact admin to change phone</div>
+      </div>
+    </div>
+
+    <div class="fc">
+      <div class="fs">Vehicle details</div>
+      <div class="fld">
+        <div class="lbl">License Number</div>
+        <input class="inp mono" value="{{ d.license_number }}" disabled>
+        <div class="fhint">Cannot be changed</div>
+      </div>
+      <div class="fld-row">
+        <div class="fld">
+          <div class="lbl">Vehicle Plate <span class="req">*</span></div>
+          <input class="inp mono" type="text" name="vehicle_plate" id="vehicle_plate" value="{{ d.vehicle_plate }}" data-rule="plate" data-mask="plate" maxlength="12" required>
+          <span class="ferr" id="vehicle_plate_err"></span>
+          <span class="fok" id="vehicle_plate_ok">✓ Valid</span>
+        </div>
+        <div class="fld">
+          <div class="lbl">Vehicle Model</div>
+          <input class="inp" type="text" name="vehicle_model" value="{{ d.vehicle_model or '' }}" placeholder="e.g. Toyota Corolla">
+        </div>
+      </div>
+    </div>
+
+    <div class="fc">
+      <div class="fs">Change password <span class="lhint" style="text-transform:none;letter-spacing:0">Leave blank to keep current</span></div>
+      <div class="fld">
+        <div class="lbl">New Password</div>
+        <div class="pw"><input class="inp" type="password" name="new_password" id="new_password" placeholder="Min. 6 characters" data-rule="pw"><button type="button" class="pw-btn" onclick="togglePw('new_password',this)">👁</button></div>
+        <span class="ferr" id="new_password_err"></span>
+      </div>
+      <div class="fld">
+        <div class="lbl">Confirm Password</div>
+        <div class="pw"><input class="inp" type="password" name="confirm_password" id="confirm_password" placeholder="Re-enter"><button type="button" class="pw-btn" onclick="togglePw('confirm_password',this)">👁</button></div>
+        <span class="ferr" id="confirm_password_err" style="display:none">⚠ Passwords do not match.</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" type="submit" style="margin-top:4px">Save Changes</button>
+  </form>
+</div>
+<script>
+document.getElementById('confirm_password').addEventListener('input',function(){
+  const pw=document.getElementById('new_password').value;
+  document.getElementById('confirm_password_err').style.display=(this.value&&this.value!==pw)?'flex':'none';
+});
+</script>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn" href="/driver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Dashboard</a>
+  <a class="bn" href="/driver/history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>History</a>
+  <a class="bn on" href="/driver/profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Profile</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}

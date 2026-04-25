@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "Lipalangoang",
+  "short_name": "Lipalangoang",
+  "description": "Passenger transportation booking and ride tracking app for Maseru CBD and MSU Local.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0d12",
+  "theme_color": "#0b1f5f",
+  "categories": ["travel", "transportation", "productivity"],
+  "icons": [
+    {
+      "src": "/static/icons/icon.jpg",
+      "sizes": "588x340",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

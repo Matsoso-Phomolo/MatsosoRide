@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Drivers{% endblock %}
+{% block topbar %}<div class="topbar"><a href="/admin" class="t-back">← Back</a><span class="t-title" style="text-align:center">Drivers</span><span class="role-pill rp-admin">Admin</span></div>{% endblock %}
+{% block content %}
+<div style="padding-bottom:3rem">
+  <form method="GET" action="/admin/drivers">
+    <div class="sbar">
+      <div class="iw" style="flex:1"><span class="ico" style="font-size:13px">🔍</span><input class="inp" type="text" name="q" value="{{ search }}" placeholder="Name, plate, or license…" style="padding-left:34px;min-height:40px;font-size:13px;border-radius:8px"></div>
+      <button type="submit" class="find">Find</button>
+    </div>
+    <div class="fpanel">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="fld" style="flex:1"><div class="lbl" style="font-size:10px">Availability</div><div class="sw"><select class="sel" name="avail" style="min-height:36px;padding:7px 28px 7px 10px;font-size:12px"><option value="">All Drivers</option><option value="1" {% if avail_filter=='1' %}selected{% endif %}>🟢 Online Only</option><option value="0" {% if avail_filter=='0' %}selected{% endif %}>⚫ Offline Only</option></select></div></div>
+        <div class="ffoot" style="margin:0;padding-bottom:0"><button type="submit" class="btn btn-primary" style="height:36px">Apply</button><a href="/admin/drivers" class="btn btn-ghost" style="height:36px">Clear</a></div>
+      </div>
+    </div>
+  </form>
+  <div class="sh">{{ drivers|length }} driver(s)<a href="/admin/drivers/new" class="btn btn-primary btn-sm">+ Add Driver</a></div>
+  {% for d in drivers %}
+  <div class="card" style="margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="av" style="background:var(--green);width:40px;height:40px;font-size:15px">{{ d.first_name[0] }}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px">{{ d.first_name }} {{ d.last_name }}</div>
+        <div style="font-size:11.5px;color:var(--tx3)"><span class="mono">{{ d.vehicle_plate }}</span> · {{ d.vehicle_model or '—' }}</div>
+      </div>
+      <span style="font-size:9.5px;padding:2px 8px;border-radius:100px;{% if d.is_available %}background:var(--green-bg);color:var(--green){% else %}background:var(--s2);color:var(--tx3){% endif %}">{% if d.is_available %}🟢 Online{% else %}⚫ Offline{% endif %}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;text-align:center">
+      <div style="background:var(--s2);border-radius:8px;padding:8px"><div style="font-weight:700;color:var(--brand)">{{ d.total_rides }}</div><div style="font-size:10px;color:var(--tx3)">Rides</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:8px"><div style="font-weight:700;color:var(--green)">M{{ '%.0f'|format(d.total_earned) }}</div><div style="font-size:10px;color:var(--tx3)">Earned</div></div>
+    </div>
+    <div class="bgrp">
+      <a href="/admin/drivers/{{ d.driver_id }}/edit" class="btn btn-ghost btn-sm">✏️ Edit</a>
+      <form method="POST" action="/admin/drivers/{{ d.driver_id }}/toggle" id="tglD{{ d.driver_id }}" style="flex:1">
+        <button type="button" class="btn btn-ghost btn-sm btn-full"
+          onclick="showSheet('Toggle Driver?','Change {{ d.first_name }}\'s availability status?',()=>document.getElementById('tglD{{ d.driver_id }}').submit())">
+          {{ '⚫ Set Offline' if d.is_available else '🟢 Set Online' }}
+        </button>
+      </form>
+      <form method="POST" action="/admin/drivers/{{ d.driver_id }}/delete" id="delD{{ d.driver_id }}">
+        <button type="button" class="btn btn-danger btn-sm"
+          onclick="showSheet('Delete Driver?','{{ d.first_name }} will be permanently removed. This cannot be undone.',()=>document.getElementById('delD{{ d.driver_id }}').submit())">
+          🗑
+        </button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty"><div class="ei">🚗</div><div>No drivers found.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn" href="/admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Home</a>
+  <a class="bn" href="/admin/rides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Rides</a>
+  <a class="bn on" href="/admin/drivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Drivers</a>
+  <a class="bn" href="/admin/reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}

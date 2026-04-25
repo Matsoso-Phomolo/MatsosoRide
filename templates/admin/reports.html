@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block topbar %}<div class="topbar"><a href="/admin" class="t-back">← Back</a><span class="t-title" style="text-align:center">Reports</span><span class="role-pill rp-admin">Admin</span></div>{% endblock %}
+{% block content %}
+<div style="padding-bottom:3rem">
+
+  <div style="padding:12px 16px 0">
+    <div class="fc">
+      <div class="fs">Last 14 days</div>
+      {% if daily %}
+      <div style="display:flex;flex-direction:column;gap:5px">
+        {% set max_rides = daily|map(attribute='rides')|max %}
+        {% for day in daily %}
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:10px;color:var(--tx3);font-family:var(--mono);width:72px;flex-shrink:0">{{ day.day }}</div>
+          <div style="flex:1;background:var(--s2);border-radius:4px;height:20px;overflow:hidden;position:relative">
+            {% set pct = ((day.rides / max_rides) * 100)|int if max_rides > 0 else 0 %}
+            <div style="position:absolute;inset:0;width:{{ pct }}%;background:var(--brand-bg);border-right:2px solid var(--brand)"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 7px;font-size:10.5px;font-weight:600;color:var(--brand)">{{ day.rides }} rides</div>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:var(--tx2);width:44px;text-align:right">M{{ '%.0f'|format(day.revenue) }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty" style="padding:20px"><div>No data yet.</div></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="padding:12px 16px 0">
+    <div class="fc">
+      <div class="fs">Generate new report</div>
+      <form id="reportForm" method="POST" action="/admin/reports" onsubmit="return vReport()">
+        <div class="fld" style="margin-bottom:10px">
+          <div class="lbl">Report Type <span class="req">*</span></div>
+          <div class="sw">
+            <select class="sel" name="report_type" id="report_type" required>
+              <option value="">- Select type -</option>
+              {% for rt in ['Daily Summary','Weekly Summary','Monthly Summary','Driver Performance','Revenue Report','Location Demand'] %}
+              <option value="{{ rt }}">{{ rt }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="fld-row" style="margin-bottom:10px">
+          <div class="fld">
+            <div class="lbl">Report Date <span class="req">*</span></div>
+            <input class="inp" type="date" name="report_date" id="report_date" value="{{ today }}" required>
+          </div>
+          <div class="fld">
+            <div class="lbl">Top Location</div>
+            <div class="sw"><select class="sel" name="top_location_id" style="font-size:12px">
+              <option value="">- Auto-detect -</option>
+              {% for loc in locations %}<option value="{{ loc.location_id }}">{{ loc.location_name }}</option>{% endfor %}
+            </select></div>
+          </div>
+        </div>
+        <div class="fld" style="margin-bottom:10px">
+          <div class="lbl">Notes <span class="ctr" id="notes_ctr">0/200</span></div>
+          <textarea class="ta" name="notes" id="notes" maxlength="200" placeholder="Summary or observations..."></textarea>
+        </div>
+        <button class="btn btn-primary btn-full" type="submit">Generate Report</button>
+      </form>
+    </div>
+  </div>
+
+  <form method="GET" action="/admin/reports">
+    <div class="sbar">
+      <div class="iw" style="flex:1"><span class="ico" style="font-size:13px">🔍</span><input class="inp" type="text" name="q" value="{{ search }}" placeholder="Find report by type or notes..." style="padding-left:34px;min-height:40px;font-size:13px;border-radius:8px"></div>
+      <button type="submit" class="find">Find</button>
+    </div>
+    <div class="fpanel">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="fld" style="flex:1"><div class="lbl" style="font-size:10px">Type</div><div class="sw"><select class="sel" name="type_filter" style="min-height:36px;padding:7px 28px 7px 10px;font-size:12px"><option value="">All Types</option>{% for rt in ['Daily Summary','Weekly Summary','Monthly Summary','Driver Performance','Revenue Report'] %}<option value="{{ rt }}" {% if type_filter==rt %}selected{% endif %}>{{ rt }}</option>{% endfor %}</select></div></div>
+        <div class="ffoot" style="margin:0"><button type="submit" class="btn btn-primary" style="height:36px">Apply</button><a href="/admin/reports" class="btn btn-ghost" style="height:36px">Clear</a></div>
+      </div>
+    </div>
+  </form>
+
+  <div class="sh">{{ reports|length }} report(s)</div>
+  {% for r in reports %}
+  <div class="card" style="margin-bottom:8px">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:20px">📋</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px">{{ r.report_type }}</div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:2px">{{ r.report_date }} · Generated {{ r.generated_at.strftime('%Y-%m-%d %H:%M') if r.generated_at else '' }}</div>
+        {% if r.notes %}<div style="font-size:12px;color:var(--tx2);margin-top:4px">{{ r.notes }}</div>{% endif %}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px">
+      <div style="background:var(--s2);border-radius:8px;padding:8px;text-align:center"><div style="font-weight:700;color:var(--brand)">{{ r.total_rides }}</div><div style="font-size:10px;color:var(--tx3)">Rides</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:8px;text-align:center"><div style="font-weight:700;color:var(--green)">M{{ '%.0f'|format(r.total_revenue or 0) }}</div><div style="font-size:10px;color:var(--tx3)">Revenue</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:8px;text-align:center"><div style="font-weight:700;font-size:11px">{{ r.top_location_name or '-' }}</div><div style="font-size:10px;color:var(--tx3)">Top Location</div></div>
+    </div>
+    <div class="bgrp" style="margin-top:10px">
+      <a href="/admin/reports/{{ r.report_id }}/pdf" class="btn btn-primary btn-sm">Download PDF</a>
+      <form method="POST" action="/admin/reports/{{ r.report_id }}/delete" id="delR{{ r.report_id }}" style="margin:0">
+        <button type="button" class="btn btn-ghost btn-sm"
+          onclick="showSheet('Delete Report?','This report will be permanently deleted.',()=>document.getElementById('delR{{ r.report_id }}').submit())">
+          Delete Report
+        </button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty"><div class="ei">📊</div><div>No reports yet.<br>Generate your first report above.</div></div>
+  {% endfor %}
+</div>
+
+<script>
+charCtr('notes','notes_ctr',200);
+function vReport(){
+  const t=document.getElementById('report_type').value;
+  const d=document.getElementById('report_date').value;
+  if(!t){toast('Please select a report type.','var(--red)');return false;}
+  if(!d){toast('Please select a report date.','var(--red)');return false;}
+  return true;
+}
+</script>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn" href="/admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Home</a>
+  <a class="bn" href="/admin/rides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Rides</a>
+  <a class="bn" href="/admin/drivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Drivers</a>
+  <a class="bn on" href="/admin/reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}

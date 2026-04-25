@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Ride #{{ ride.ride_id }}{% endblock %}
+{% block topbar %}
+<div class="topbar">
+  <a href="/book" class="t-back">← Book</a>
+  <span class="t-title" style="text-align:center">Ride #{{ ride.ride_id }}</span>
+  <span class="chip c-{{ ride.ride_status|lower|replace('_','-') }}" style="font-size:10px">
+    {{ ride.ride_status.replace('_',' ') }}
+  </span>
+</div>
+{% endblock %}
+{% block content %}
+<div style="padding:0 0 3rem">
+
+  {% if ride.ride_status == 'REQUESTED' %}
+  <div class="ib ib-info" style="margin:12px 16px 0">
+    <span class="ib-ico">⏳</span>
+    <div><strong>Waiting for a driver</strong><br><span style="font-size:11px">A nearby driver will accept your ride shortly.</span></div>
+  </div>
+  {% elif ride.ride_status == 'ACCEPTED' %}
+  <div class="ib ib-brand" style="margin:12px 16px 0">
+    <span class="ib-ico">🚗</span>
+    <div><strong style="color:var(--brand)">Driver on the way!</strong><br><span style="font-size:11px">{{ ride.driver_name }} is heading to your pickup.</span></div>
+  </div>
+  {% elif ride.ride_status == 'IN_PROGRESS' %}
+  <div style="margin:12px 16px 0;background:var(--orange-bg);border:1px solid rgba(251,146,60,.25);color:var(--orange);border-radius:12px;padding:11px 12px;display:flex;gap:10px;font-size:12px">
+    <span style="font-size:15px">⚡</span>
+    <div><strong>Ride in progress</strong><br>On the way to {{ ride.dropoff_name }}</div>
+  </div>
+  {% elif ride.ride_status == 'COMPLETED' %}
+  <div class="ib" style="margin:12px 16px 0;background:var(--green-bg);border-color:var(--green-bd);color:var(--green)">
+    <span class="ib-ico">✓</span>
+    <div><strong>Ride completed</strong> — Fare: M {{ '%.2f'|format(ride.fare_amount or 0) }}</div>
+  </div>
+  {% endif %}
+
+  <div class="card" style="margin-top:12px">
+    <div style="font-size:10.5px;font-weight:700;color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--bd);margin-bottom:12px">Route</div>
+    <div style="display:flex;gap:10px;align-items:stretch">
+      <div style="display:flex;flex-direction:column;align-items:center;padding-top:2px">
+        <div class="du"></div>
+        <div style="flex:1;width:1px;background:var(--bd);min-height:24px"></div>
+        <div class="dd"></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+        <div><div style="font-size:9.5px;color:var(--tx3);font-weight:700;letter-spacing:.3px">PICKUP</div><div style="font-size:14px;font-weight:600;margin-top:1px">{{ ride.pickup_name }}</div></div>
+        <div><div style="font-size:9.5px;color:var(--tx3);font-weight:700;letter-spacing:.3px">DESTINATION</div><div style="font-size:14px;font-weight:600;margin-top:1px">{{ ride.dropoff_name }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:var(--sp3)">
+    <div style="font-size:10.5px;font-weight:700;color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--bd);margin-bottom:8px">Details</div>
+    <div class="dr"><span class="dl">Ride ID</span><span class="dv mono">#{{ ride.ride_id }}</span></div>
+    <div class="dr"><span class="dl">Passenger</span><span class="dv">{{ ride.passenger_name }}</span></div>
+    <div class="dr"><span class="dl">Phone</span><span class="dv mono">{{ ride.passenger_phone }}</span></div>
+    <div class="dr"><span class="dl">Payment</span><span class="dv">{{ ride.method_name }}</span></div>
+    <div class="dr"><span class="dl">Requested</span><span class="dv">{{ ride.requested_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+    {% if ride.fare_amount %}
+    <div class="dr"><span class="dl">Fare</span><span class="dv text-brand" style="font-size:18px;font-weight:700">M {{ '%.2f'|format(ride.fare_amount) }}</span></div>
+    {% endif %}
+  </div>
+
+  {% if ride.driver_name %}
+  <div class="card" style="margin-top:var(--sp3)">
+    <div style="font-size:10.5px;font-weight:700;color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--bd);margin-bottom:12px">Your Driver</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="av" style="background:var(--green)">{{ ride.driver_name[0] }}</div>
+      <div>
+        <div style="font-size:15px;font-weight:700">{{ ride.driver_name }}</div>
+        <div style="font-size:12px;color:var(--tx3);margin-top:2px">{{ ride.vehicle_model }} · <span class="mono">{{ ride.vehicle_plate }}</span></div>
+        <div style="font-size:12px;color:var(--blue);margin-top:2px">📞 {{ ride.driver_phone }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if ride.notes %}
+  <div class="card" style="margin-top:var(--sp3)">
+    <div style="font-size:10.5px;font-weight:700;color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--bd);margin-bottom:8px">Notes</div>
+    <p style="font-size:13px;color:var(--tx2);line-height:1.6">{{ ride.notes }}</p>
+  </div>
+  {% endif %}
+
+  <div style="padding:16px 16px 0">
+    <a href="/book" class="btn btn-ghost btn-full">Book Another Ride</a>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+{% if ride.ride_status in ['REQUESTED','ACCEPTED','IN_PROGRESS'] %}
+<script>
+setInterval(()=>{
+  fetch('/api/ride/{{ ride.ride_id }}/status')
+    .then(r=>r.json())
+    .then(d=>{ if(d.status!=='{{ ride.ride_status }}') location.reload(); });
+}, 8000);
+</script>
+{% endif %}
+{% endblock %}

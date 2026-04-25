@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}All Rides{% endblock %}
+{% block topbar %}<div class="topbar"><a href="/admin" class="t-back">← Back</a><span class="t-title" style="text-align:center">All Rides</span><span class="role-pill rp-admin">Admin</span></div>{% endblock %}
+{% block content %}
+<div style="padding-bottom:3rem">
+  <form method="GET" action="/admin/rides">
+    <div class="sbar">
+      <div class="iw" style="flex:1"><span class="ico" style="font-size:13px">🔍</span><input class="inp" type="text" name="q" value="{{ search }}" placeholder="Passenger, driver, location…" style="padding-left:34px;min-height:40px;font-size:13px;border-radius:8px"></div>
+      <button type="submit" class="find">Find</button>
+    </div>
+    <div class="fpanel">
+      <div class="fld-row">
+        <div class="fld"><div class="lbl" style="font-size:10px">Status</div><div class="sw"><select class="sel" name="status" style="min-height:36px;padding:7px 28px 7px 10px;font-size:12px"><option value="">All Statuses</option>{% for s in ['REQUESTED','ACCEPTED','IN_PROGRESS','COMPLETED','CANCELLED'] %}<option value="{{ s }}" {% if status==s %}selected{% endif %}>{{ s.replace('_',' ') }}</option>{% endfor %}</select></div></div>
+        <div class="fld"><div class="lbl" style="font-size:10px">Location</div><div class="sw"><select class="sel" name="loc_id" style="min-height:36px;padding:7px 28px 7px 10px;font-size:12px"><option value="">All Locations</option>{% for loc in locations %}<option value="{{ loc.location_id }}" {% if loc_id|string==loc.location_id|string %}selected{% endif %}>{{ loc.location_name }}</option>{% endfor %}</select></div></div>
+      </div>
+      <div class="fld-row">
+        <div class="fld"><div class="lbl" style="font-size:10px">From</div><input class="inp" type="date" name="date_from" value="{{ date_from }}" style="min-height:36px;padding:7px 10px;font-size:12px"></div>
+        <div class="fld"><div class="lbl" style="font-size:10px">To</div><input class="inp" type="date" name="date_to" value="{{ date_to }}" style="min-height:36px;padding:7px 10px;font-size:12px"></div>
+      </div>
+      <div class="ffoot"><button type="submit" class="btn btn-primary">Apply Filters</button><a href="/admin/rides" class="btn btn-ghost">Clear</a></div>
+    </div>
+  </form>
+  <div class="sh">{{ rides|length }} ride(s)</div>
+  {% for r in rides %}
+  <div class="rc" style="margin-bottom:8px">
+    <div class="rc-h">
+      <div class="rc-r">
+        <div class="rrow"><div class="du"></div>{{ r.pickup_name }}</div>
+        <div class="vb" style="margin:3px 0 3px 3px"></div>
+        <div class="rrow"><div class="dd"></div>{{ r.dropoff_name }}</div>
+      </div>
+      <span class="chip c-{{ r.ride_status|lower|replace('_','-') }}" style="font-size:10px">{{ r.ride_status.replace('_',' ') }}</span>
+    </div>
+    <div class="rc-b">
+      <div class="chips" style="margin-bottom:{% if r.ride_status in ['REQUESTED','ACCEPTED','IN_PROGRESS'] %}8px{% else %}0{% endif %}">
+        <span class="chip c-muted mono" style="font-size:10px">#{{ r.ride_id }}</span>
+        <span class="chip c-muted">{{ r.passenger_name }}</span>
+        <span class="chip c-muted mono">{{ r.passenger_phone }}</span>
+        {% if r.driver_name %}<span class="chip c-muted">🚗 {{ r.driver_name }}</span>{% endif %}
+        {% if r.fare_amount %}<span class="chip c-brand">M {{ '%.2f'|format(r.fare_amount) }}</span>{% endif %}
+      </div>
+      {% if r.ride_status in ['REQUESTED','ACCEPTED','IN_PROGRESS'] %}
+      <form method="POST" action="/admin/rides/{{ r.ride_id }}/cancel" id="cancel{{ r.ride_id }}">
+        <button type="button" class="btn btn-ghost btn-sm"
+          onclick="showSheet('Cancel Ride #{{ r.ride_id }}?','This will cancel the ride immediately.',()=>document.getElementById('cancel{{ r.ride_id }}').submit())">
+          ✕ Cancel Ride
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty"><div class="ei">🏁</div><div>No rides found.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn" href="/admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Home</a>
+  <a class="bn on" href="/admin/rides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Rides</a>
+  <a class="bn" href="/admin/drivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Drivers</a>
+  <a class="bn" href="/admin/reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}

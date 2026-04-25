@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block topbar %}
+<div class="topbar">
+  <a href="/" class="t-back">Back</a>
+  <span class="t-title" style="text-align:center">Login</span>
+  <span style="width:64px"></span>
+</div>
+{% endblock %}
+{% block content %}
+<div class="fp">
+  <div style="text-align:center;padding:8px 0 20px">
+    <div style="font-size:40px;margin-bottom:8px">Login</div>
+    <h1 style="font-size:20px;font-weight:700">Staff Login</h1>
+    <p style="font-size:12.5px;color:var(--tx3);margin-top:4px">Drivers and administrators only</p>
+  </div>
+
+  <form id="loginForm" method="POST" action="/login">
+    <input type="hidden" name="role" id="role-inp" value="{{ role }}">
+
+    <div class="fc">
+      <div class="fs">Select your role</div>
+      <div class="rtabs">
+        <div class="rtab {% if role=='driver' %}on{% endif %}" data-role="driver">
+          <span class="ri">Driver</span>Driver
+        </div>
+        <div class="rtab {% if role=='admin' %}on{% endif %}" data-role="admin">
+          <span class="ri">Admin</span>Admin
+        </div>
+      </div>
+    </div>
+
+    <div class="fc">
+      <div class="fs">Credentials</div>
+      <div class="fld">
+        <div class="lbl" id="identifier_label">Phone Number <span class="req">*</span></div>
+        <div class="iw">
+          <span class="ico" id="identifier_icon" style="font-size:10px;font-weight:700;letter-spacing:.4px;width:24px;text-align:center">TEL</span>
+          <input class="inp" type="text" name="identifier" id="identifier"
+                 value="{{ ident }}"
+                 placeholder="{% if role == 'admin' %}Username or email{% else %}+26658XXXXXX{% endif %}"
+                 data-rule="required" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+        </div>
+        <span class="ferr" id="identifier_err"></span>
+      </div>
+      <div class="fld">
+        <div class="lbl">Password <span class="req">*</span></div>
+        <div class="pw">
+          <input class="inp" type="password" name="password" id="password"
+                 placeholder="Your password" data-rule="required"
+                 autocomplete="current-password" required>
+          <button type="button" class="pw-btn" onclick="togglePw('password',this)">Show</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" type="submit" style="margin-top:4px">Sign In</button>
+      <div class="ib ib-brand" style="display:block;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand);margin-bottom:8px">
+          Demo Credentials
+        </div>
+        <div id="driver_demo" style="display:block;font-size:12px;line-height:1.7;color:var(--tx2)">
+          <div><strong>Driver 1:</strong> <span class="mono">+26658200001</span> / <span class="mono">Mpho@1234</span></div>
+          <div><strong>Driver 2:</strong> <span class="mono">+26658200002</span> / <span class="mono">RetsTau@1234</span></div>
+          <div><strong>Driver 3:</strong> <span class="mono">+26658200003</span> / <span class="mono">Selibe@1234</span></div>
+        </div>
+        <div id="admin_demo" style="display:block;font-size:12px;line-height:1.7;color:var(--tx2);margin-top:8px;padding-top:8px;border-top:1px solid var(--brand-bd)">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand);margin-bottom:6px">
+            Admin Demo
+          </div>
+          <div><strong>Username:</strong> <span class="mono">admin</span></div>
+          <div><strong>Email:</strong> <span class="mono">admin@urbancab.co.ls</span></div>
+          <div><strong>Password:</strong> <span class="mono">Admin@1234</span></div>
+        </div>
+        <div id="superadmin_demo" style="display:block;font-size:12px;line-height:1.7;color:var(--tx2);margin-top:8px;padding-top:8px;border-top:1px solid var(--brand-bd)">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand);margin-bottom:6px">
+            Superadmin Demo
+          </div>
+          <div><strong>Username:</strong> <span class="mono">Phomolo Matsoso</span></div>
+          <div><strong>Email:</strong> <span class="mono">superadmin@gmail.com</span></div>
+          <div><strong>Password:</strong> <span class="mono">SuperAdmin@1234</span></div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+function applyRole(role) {
+  const inp = document.getElementById('identifier');
+  const roleInp = document.getElementById('role-inp');
+  const label = document.getElementById('identifier_label');
+  const icon = document.getElementById('identifier_icon');
+
+  document.querySelectorAll('.rtab').forEach(t => t.classList.toggle('on', t.dataset.role === role));
+  roleInp.value = role;
+  inp.classList.remove('err', 'ok');
+
+  if (role === 'admin') {
+    label.innerHTML = 'Username / Email <span class="req">*</span>';
+    icon.textContent = 'ADM';
+    inp.placeholder = 'Username or email';
+  } else {
+    label.innerHTML = 'Phone Number <span class="req">*</span>';
+    icon.textContent = 'TEL';
+    inp.placeholder = '+26658XXXXXX';
+  }
+}
+
+function fill(role, ident, pw) {
+  applyRole(role);
+  document.getElementById('identifier').value = ident;
+  document.getElementById('password').value = pw;
+  toast('Demo credentials filled');
+}
+
+document.querySelectorAll('.rtab[data-role]').forEach(tab => {
+  tab.addEventListener('click', function() {
+    applyRole(this.dataset.role);
+  });
+});
+
+applyRole(document.getElementById('role-inp').value || 'driver');
+</script>
+{% endblock %}

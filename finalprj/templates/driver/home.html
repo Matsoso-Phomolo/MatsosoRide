@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Driver Dashboard{% endblock %}
+{% block topbar_title %}Driver Dashboard{% endblock %}
+{% block content %}
+<div style="padding-bottom:3rem">
+  <div class="phero">
+    <div class="av" style="background:var(--green)">{{ session.name[0] }}</div>
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:700">{{ session.name }}</div>
+      <div style="font-size:11.5px;color:var(--tx3);margin-top:2px">{{ driver.vehicle_model }} · <span class="mono">{{ driver.vehicle_plate }}</span></div>
+    </div>
+    <form method="POST" action="/driver/toggle">
+      <button type="button" class="btn btn-sm {% if driver.is_available %}btn-success{% else %}btn-ghost{% endif %}"
+        onclick="showSheet('{% if driver.is_available %}Go Offline?{% else %}Go Online?{% endif %}','{% if driver.is_available %}You will stop receiving requests.{% else %}You will start receiving requests.{% endif %}',()=>this.closest('form').submit())">
+        {% if driver.is_available %}🟢 Online{% else %}⚫ Offline{% endif %}
+      </button>
+    </form>
+  </div>
+
+  <div class="sgrid">
+    <div class="scard"><div class="sv">{{ stats.total or 0 }}</div><div class="sl">Total Rides</div></div>
+    <div class="scard"><div class="sv text-green">{{ stats.completed or 0 }}</div><div class="sl">Completed</div></div>
+    <div class="scard" style="grid-column:span 2"><div class="sv" style="font-size:20px">M {{ '%.2f'|format(stats.earned or 0) }}</div><div class="sl">Total Earned</div></div>
+  </div>
+
+  {% if my_rides %}
+  <div class="sh">Active Rides</div>
+  {% for r in my_rides %}
+  <div class="rc" style="margin-bottom:8px">
+    <div class="rc-h">
+      <div class="rc-r">
+        <div class="rrow"><div class="du"></div>{{ r.pickup_name }}</div>
+        <div class="vb" style="margin:3px 0 3px 3px"></div>
+        <div class="rrow"><div class="dd"></div>{{ r.dropoff_name }}</div>
+      </div>
+      <span class="chip c-{{ r.ride_status|lower|replace('_','-') }}">{{ r.ride_status.replace('_',' ') }}</span>
+    </div>
+    <div class="rc-b">
+      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:8px">{{ r.passenger_name }} · <span class="mono" style="color:var(--blue)">{{ r.passenger_phone }}</span></div>
+      {% if r.ride_status == 'ACCEPTED' %}
+      <form method="POST" action="/driver/start/{{ r.ride_id }}">
+        <button type="button" class="btn btn-subtle btn-full"
+          onclick="showSheet('Start Ride?','Confirm you have picked up {{ r.passenger_name }}.',()=>this.closest('form').submit())">
+          ▶ Start Ride
+        </button>
+      </form>
+      {% elif r.ride_status == 'IN_PROGRESS' %}
+      <div style="background:var(--s2);border:1px solid var(--brand-bd);border-radius:var(--r3);padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px">Fare to collect</div>
+          <div style="font-size:11px;color:var(--tx2)">Fixed rate — set at booking</div>
+        </div>
+        <div style="font-size:28px;font-weight:800;color:var(--brand)">M {{ "%.2f"|format(r.fare_amount or 0) }}</div>
+      </div>
+      <form method="POST" action="/driver/complete/{{ r.ride_id }}" id="cForm{{ r.ride_id }}">
+        <button type="button" class="btn btn-success btn-full"
+          onclick="showSheet('Complete Ride?','Confirm you have collected M {{ "%.2f"|format(r.fare_amount or 0) }} from {{ r.passenger_name }}.',()=>document.getElementById('cForm{{ r.ride_id }}').submit())">
+          ✓ Complete Ride
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="sh">
+    Available Requests
+    {% if pending %}<span style="background:var(--red);color:#fff;font-size:9px;padding:1px 6px;border-radius:100px;font-weight:700">{{ pending|length }}</span>{% endif %}
+  </div>
+
+  {% if not driver.is_available %}
+  <div class="card"><div class="ib ib-info" style="border:none;padding:0"><span class="ib-ico">📴</span><span>You are <strong>offline</strong>. Toggle to Online above to receive requests.</span></div></div>
+  {% elif pending %}
+    {% for r in pending %}
+    <div class="rc" style="margin-bottom:8px">
+      <div class="rc-h">
+        <div class="rc-r">
+          <div class="rrow"><div class="du"></div>{{ r.pickup_name }}</div>
+          <div class="vb" style="margin:3px 0 3px 3px"></div>
+          <div class="rrow"><div class="dd"></div>{{ r.dropoff_name }}</div>
+        </div>
+        <span class="chip c-req">New</span>
+      </div>
+      <div class="rc-b">
+        <div class="chips" style="margin-bottom:8px">
+          <span class="chip c-muted">👤 {{ r.passenger_name }}</span>
+          <span class="chip c-muted">📞 {{ r.passenger_phone }}</span>
+          <span class="chip c-brand">{{ r.method_name }}</span>
+        </div>
+        {% if r.notes %}<div style="font-size:11.5px;color:var(--tx3);background:var(--s2);padding:7px;border-radius:7px;margin-bottom:8px">📝 {{ r.notes }}</div>{% endif %}
+        <form method="POST" action="/driver/accept/{{ r.ride_id }}" id="aForm{{ r.ride_id }}">
+          <button type="button" class="btn btn-primary btn-full"
+            onclick="showSheet('Accept Ride?','Accept the ride from {{ r.passenger_name }}?',()=>document.getElementById('aForm{{ r.ride_id }}').submit())">
+            ✓ Accept Ride
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty"><div class="ei">🔍</div><div>No requests right now.<br>Stay online to receive rides.</div></div>
+  {% endif %}
+</div>
+
+<script>
+setTimeout(()=>location.reload(),15000);
+</script>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn on" href="/driver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Dashboard</a>
+  <a class="bn" href="/driver/history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>History</a>
+  <a class="bn" href="/driver/profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Profile</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}

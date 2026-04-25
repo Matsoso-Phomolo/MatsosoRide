@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block topbar_title %}Admin Panel{% endblock %}
+{% block content %}
+<div style="padding-bottom:3rem">
+  <div style="padding:16px 16px 8px"><p style="font-size:11.5px;color:var(--tx3)">Signed in as</p><h2 style="font-size:20px;font-weight:700">{{ session.name }} ⚡</h2></div>
+  <div style="padding:0 16px 12px">
+    <a href="/admin/admins" class="btn btn-primary">Manage Admins</a>
+  </div>
+  <div class="sgrid">
+    <div class="scard"><div class="sv">{{ stats.total or 0 }}</div><div class="sl">Total Rides</div></div>
+    <div class="scard"><div class="sv text-green">{{ stats.completed or 0 }}</div><div class="sl">Completed</div></div>
+    <div class="scard"><div class="sv" style="color:var(--blue)">{{ drivers_online.c or 0 }}<span style="font-size:13px;color:var(--tx3)">/{{ drivers_total.c }}</span></div><div class="sl">Drivers Online</div></div>
+    <div class="scard"><div class="sv" style="color:var(--orange)">{{ stats.pending or 0 }}</div><div class="sl">Pending</div></div>
+    <div class="scard" style="grid-column:span 2"><div class="sv" style="font-size:18px">M {{ '%.2f'|format(stats.revenue or 0) }}</div><div class="sl">Total Revenue</div></div>
+  </div>
+  {% if stats.pending %}
+  <div class="ib ib-info" style="margin:12px 16px 0">
+    <span class="ib-ico">⏳</span>
+    <span><strong>{{ stats.pending }} ride(s)</strong> awaiting a driver - <a href="/admin/rides?status=REQUESTED" style="color:var(--brand)">view →</a></span>
+  </div>
+  {% endif %}
+  <div class="sh">Quick access</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px">
+    {% for href,icon,label,sub in [('/admin/rides','🏁','All Rides',(stats.total|string)+' total'),('/admin/drivers','👤','Drivers',(drivers_total.c|string)+' registered'),('/admin/locations','📍','Locations','Manage CBD stops'),('/admin/reports','📊','Reports','Generate & view')] %}
+    <a href="{{ href }}" style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;text-decoration:none">
+      <span style="font-size:24px">{{ icon }}</span>
+      <div><div style="font-size:13px;font-weight:600">{{ label }}</div><div style="font-size:11px;color:var(--tx3)">{{ sub }}</div></div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="sh">Top pickup locations</div>
+  <div class="card">
+    {% for loc in top_locs %}
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;{% if not loop.last %}border-bottom:1px solid var(--bd){% endif %}">
+      <span style="font-size:16px;width:24px;text-align:center;color:{% if loop.index==1 %}var(--brand){% else %}var(--tx3){% endif %}">{{ loop.index }}</span>
+      <div style="flex:1;font-size:13px;font-weight:500">{{ loc.location_name }}</div>
+      <span class="chip c-brand">{{ loc.cnt }} rides</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="sh">Recent rides</div>
+  {% for r in recent %}
+  <div class="rc" style="margin-bottom:8px">
+    <div class="rc-h">
+      <div class="rc-r">
+        <div class="rrow"><div class="du"></div>{{ r.pickup_name }}</div>
+        <div class="vb" style="margin:3px 0 3px 3px"></div>
+        <div class="rrow"><div class="dd"></div>{{ r.dropoff_name }}</div>
+      </div>
+      <span class="chip c-{{ r.ride_status|lower|replace('_','-') }}" style="font-size:10px">{{ r.ride_status.replace('_',' ') }}</span>
+    </div>
+    <div class="rc-b"><div class="chips">
+      <span class="chip c-muted">{{ r.passenger_name }}</span>
+      {% if r.driver_name %}<span class="chip c-muted">👤 {{ r.driver_name }}</span>{% endif %}
+      {% if r.fare_amount %}<span class="chip c-brand">M {{ '%.2f'|format(r.fare_amount) }}</span>{% endif %}
+    </div></div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn on" href="/admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Home</a>
+  <a class="bn" href="/admin/rides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Rides</a>
+  <a class="bn" href="/admin/drivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Drivers</a>
+  <a class="bn" href="/admin/reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}

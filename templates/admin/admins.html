@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Admins{% endblock %}
+{% block topbar %}<div class="topbar"><a href="/admin" class="t-back">Back</a><span class="t-title" style="text-align:center">Admin Users</span><span class="role-pill rp-admin">Admin</span></div>{% endblock %}
+{% block content %}
+<div style="padding-bottom:3rem">
+  <div style="padding:12px 16px 0">
+    <div class="fc">
+      <div class="fs">Add new admin</div>
+      <form id="addAdminForm" method="POST" action="/admin/admins" onsubmit="return vForm('addAdminForm')">
+        <div class="fld-row" style="margin-bottom:10px">
+          <div class="fld">
+            <div class="lbl">Username <span class="req">*</span></div>
+            <input class="inp" type="text" name="username" id="username" data-rule="required" minlength="3" required>
+            <span class="ferr" id="username_err"></span>
+          </div>
+          <div class="fld">
+            <div class="lbl">Role <span class="req">*</span></div>
+            <div class="sw">
+              <select class="sel" name="role" required>
+                <option value="admin">Admin</option>
+                <option value="superadmin">Superadmin</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="fld" style="margin-bottom:10px">
+          <div class="lbl">Email Address <span class="req">*</span></div>
+          <input class="inp" type="email" name="email" id="email" data-rule="email" autocomplete="off" required>
+          <span class="ferr" id="email_err"></span>
+        </div>
+        <div class="fld-row" style="margin-bottom:10px">
+          <div class="fld">
+            <div class="lbl">Password <span class="req">*</span></div>
+            <div class="pw">
+              <input class="inp" type="password" name="password" id="password" data-rule="pw" minlength="6" required>
+              <button type="button" class="pw-btn" onclick="togglePw('password',this)">Show</button>
+            </div>
+            <span class="ferr" id="password_err"></span>
+          </div>
+          <div class="fld">
+            <div class="lbl">Confirm Password <span class="req">*</span></div>
+            <div class="pw">
+              <input class="inp" type="password" name="confirm_password" id="confirm_password" required>
+              <button type="button" class="pw-btn" onclick="togglePw('confirm_password',this)">Show</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" type="submit">+ Add Admin</button>
+      </form>
+    </div>
+  </div>
+
+  <form method="GET" action="/admin/admins">
+    <div class="sbar">
+      <div class="iw" style="flex:1"><span class="ico" style="font-size:13px">Find</span><input class="inp" type="text" name="q" value="{{ search }}" placeholder="Find by username, email, or role" style="padding-left:46px;min-height:40px;font-size:13px;border-radius:8px"></div>
+      <button type="submit" class="find">Find</button>
+    </div>
+  </form>
+
+  <div class="sh">{{ admins|length }} admin user(s)</div>
+  <div class="card">
+    {% for a in admins %}
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;{% if not loop.last %}border-bottom:1px solid var(--bd){% endif %}">
+      <div class="av" style="width:40px;height:40px;font-size:15px">{{ a.username[0]|upper }}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700">{{ a.username }}</span>
+          <span class="chip c-brand" style="font-size:9.5px">{{ a.role }}</span>
+        </div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:2px">{{ a.email }}</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:2px">Created {{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '' }} · {{ a.report_count or 0 }} report(s)</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+      <a href="/admin/admins/{{ a.admin_id }}/edit" class="btn btn-ghost btn-sm">Edit</a>
+      <form method="POST" action="/admin/admins/{{ a.admin_id }}/delete" id="delA{{ a.admin_id }}">
+        <button type="button" class="btn btn-danger btn-sm"
+          onclick="showSheet('Delete Admin?','{% if a.admin_id == session.uid %}You cannot delete your own logged-in admin account.{% elif a.report_count %}This admin has generated reports and cannot be deleted.{% else %}Delete {{ a.username }} permanently?{% endif %}',()=>document.getElementById('delA{{ a.admin_id }}').submit())"
+          {% if a.admin_id == session.uid or a.report_count %}disabled{% endif %}>
+          Delete
+        </button>
+      </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty" style="padding:24px"><div>No admin users found.</div></div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+document.getElementById('addAdminForm').addEventListener('submit', function(e) {
+  const pw = document.getElementById('password').value;
+  const cp = document.getElementById('confirm_password').value;
+  if (pw !== cp) {
+    e.preventDefault();
+    toast('Passwords do not match.', 'var(--red)');
+  }
+});
+</script>
+{% endblock %}
+{% block bnav %}
+<nav class="bnav">
+  <a class="bn" href="/admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Home</a>
+  <a class="bn" href="/admin/rides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Rides</a>
+  <a class="bn" href="/admin/drivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Drivers</a>
+  <a class="bn on" href="/admin/admins"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Admins</a>
+  <a class="bn" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</a>
+</nav>
+{% endblock %}
