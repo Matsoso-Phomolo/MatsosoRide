@@ -40,6 +40,14 @@ def repair_seed_data():
                  AND (first_name<>%s OR last_name<>%s)""",
             ("Rets'elisitsoe", "Tau", "+26658200002", "Rets'elisitsoe", "Tau")
         )
+        cur.execute(
+            "UPDATE Admin_Users SET username=%s WHERE email=%s AND username<>%s",
+            ("admin", "admin@urbancab.co.ls", "admin")
+        )
+        cur.execute(
+            "UPDATE Admin_Users SET username=%s WHERE email=%s AND username<>%s",
+            ("superadmin", "superadmin@gmail.com", "superadmin")
+        )
         mysql.connection.commit()
         cur.close()
     except Exception:
@@ -227,14 +235,14 @@ def login():
             flash('Please enter your credentials.', 'danger')
             return render_template('login.html', role=role, ident=ident)
         if role == 'driver':
-            u = q("SELECT * FROM Drivers WHERE phone_number=%s", (ident,), one=True)
+            u = q("SELECT * FROM Drivers WHERE LOWER(first_name)=LOWER(%s)", (ident,), one=True)
             if u and check_pw(pw, u['password_hash']):
                 session.update({'uid': u['driver_id'], 'role': 'driver',
                                 'name': f"{u['first_name']} {u['last_name']}"})
                 flash(f"Welcome, {u['first_name']}!", 'success')
                 return redirect(url_for('driver_home'))
         elif role == 'admin':
-            u = q("SELECT * FROM Admin_Users WHERE username=%s OR email=%s", (ident, ident), one=True)
+            u = q("SELECT * FROM Admin_Users WHERE username=%s", (ident,), one=True)
             if u and check_pw(pw, u['password_hash']):
                 session.update({'uid':u['admin_id'], 'role':'admin', 'name':u['username']})
                 flash('Admin login successful.', 'success')

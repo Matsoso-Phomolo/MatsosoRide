@@ -2,7 +2,7 @@
 {% block title %}Login{% endblock %}
 {% block topbar %}
 <div class="topbar">
-  <a href="/" class="t-back">← Back</a>
+  <a href="/" class="t-back">Back</a>
   <span class="t-title" style="text-align:center">Login</span>
   <span style="width:64px"></span>
 </div>
@@ -10,7 +10,7 @@
 {% block content %}
 <div class="fp">
   <div style="text-align:center;padding:8px 0 20px">
-    <div style="font-size:40px;margin-bottom:8px">🔑</div>
+    <div style="font-size:40px;margin-bottom:8px">Login</div>
     <h1 style="font-size:20px;font-weight:700">Staff Login</h1>
     <p style="font-size:12.5px;color:var(--tx3);margin-top:4px">Drivers and administrators only</p>
   </div>
@@ -22,10 +22,10 @@
       <div class="fs">Select your role</div>
       <div class="rtabs">
         <div class="rtab {% if role=='driver' %}on{% endif %}" data-role="driver">
-          <span class="ri">🚗</span>Driver
+          <span class="ri">Driver</span>Driver
         </div>
         <div class="rtab {% if role=='admin' %}on{% endif %}" data-role="admin">
-          <span class="ri">🔑</span>Admin
+          <span class="ri">Admin</span>Admin
         </div>
       </div>
     </div>
@@ -33,12 +33,13 @@
     <div class="fc">
       <div class="fs">Credentials</div>
       <div class="fld">
-        <div class="lbl">Phone / Username <span class="req">*</span></div>
+        <div class="lbl" id="identifier_label">Username <span class="req">*</span></div>
         <div class="iw">
-          <span class="ico">📱</span>
+          <span class="ico" id="identifier_icon" style="font-size:10px;font-weight:700;letter-spacing:.4px;width:24px;text-align:center">USR</span>
           <input class="inp" type="text" name="identifier" id="identifier"
-                 value="{{ ident }}" placeholder="+26658XXXXXX or username"
-                 data-rule="required" data-mask="phone" autocomplete="username" required>
+                 value="{{ ident }}"
+                 placeholder="{% if role == 'admin' %}admin or superadmin{% else %}Mpho, Rets'elisitsoe, or Selibe{% endif %}"
+                 data-rule="required" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
         </div>
         <span class="ferr" id="identifier_err"></span>
       </div>
@@ -48,48 +49,42 @@
           <input class="inp" type="password" name="password" id="password"
                  placeholder="Your password" data-rule="required"
                  autocomplete="current-password" required>
-          <button type="button" class="pw-btn" onclick="togglePw('password',this)">👁</button>
+          <button type="button" class="pw-btn" onclick="togglePw('password',this)">Show</button>
         </div>
       </div>
       <button class="btn btn-primary btn-full" type="submit" style="margin-top:4px">Sign In</button>
     </div>
   </form>
-
-  
 </div>
 
 <script>
-function fill(role, ident, pw) {
-  document.querySelectorAll('.rtab').forEach(t=>t.classList.remove('on'));
-  document.querySelector(`.rtab[data-role="${role}"]`).classList.add('on');
-  document.getElementById('role-inp').value = role;
-  document.getElementById('identifier').value = ident;
-  document.getElementById('password').value = pw;
-  if(role==='admin') {
-    document.getElementById('identifier').removeAttribute('data-mask');
+function applyRole(role) {
+  const inp = document.getElementById('identifier');
+  const roleInp = document.getElementById('role-inp');
+  const label = document.getElementById('identifier_label');
+  const icon = document.getElementById('identifier_icon');
+
+  document.querySelectorAll('.rtab').forEach(t => t.classList.toggle('on', t.dataset.role === role));
+  roleInp.value = role;
+  inp.classList.remove('err', 'ok');
+
+  if (role === 'admin') {
+    label.innerHTML = 'Username <span class="req">*</span>';
+    icon.textContent = 'ADM';
+    inp.placeholder = 'admin or superadmin';
+  } else {
+    label.innerHTML = 'Username <span class="req">*</span>';
+    icon.textContent = 'USR';
+    inp.placeholder = "Mpho, Rets'elisitsoe, or Selibe";
   }
-  toast('✓ Demo credentials filled');
 }
+
 document.querySelectorAll('.rtab[data-role]').forEach(tab => {
   tab.addEventListener('click', function() {
-    const role = this.dataset.role;
-    const inp = document.getElementById('identifier');
-    const roleInp = document.getElementById('role-inp');
-    
-    roleInp.value = role;
-
-    if (role === 'admin') {
-      // Force remove attributes and clear any masking classes
-      inp.removeAttribute('data-mask');
-      inp.type = "text"; 
-      inp.placeholder = 'Username or email';
-      // If using a library like IMask, you might need: 
-      // if(window.phoneMask) window.phoneMask.destroy();
-    } else {
-      inp.setAttribute('data-mask', 'phone');
-      inp.placeholder = '+266 5820 0001';
-    }
+    applyRole(this.dataset.role);
   });
 });
+
+applyRole(document.getElementById('role-inp').value || 'driver');
 </script>
 {% endblock %}

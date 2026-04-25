@@ -10,12 +10,12 @@ Database:     Run urban_cab_mysql.sql against your MySQL server first.
 Config:       Set DB_HOST, DB_USER, DB_PASSWORD, DB_NAME env vars,
               or edit the app.config lines directly in this file.
 """
-import os, hashlib, secrets, re, datetime
+import os, hashlib, secrets, re, datetime, textwrap
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
 from functools import wraps
 from flask import (Flask, render_template, request, redirect,
-                   url_for, session, flash, g, jsonify)
+                   url_for, session, flash, g, jsonify, make_response)
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -23,10 +23,43 @@ app.secret_key = secrets.token_hex(32)
 # ── MySQL config ─────────────────────────────────────────────
 app.config['MYSQL_HOST']     = os.environ.get('DB_HOST',     'localhost')
 app.config['MYSQL_USER']     = os.environ.get('DB_USER',     'root')
-app.config['MYSQL_PASSWORD'] = os.environ.get('DB_PASSWORD', 'M@yR0cks')
+app.config['MYSQL_PASSWORD'] = os.environ.get('DB_PASSWORD', '@Master5725#')
 app.config['MYSQL_DB']       = os.environ.get('DB_NAME',     'lipalangoang')
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
+
+
+def repair_seed_data():
+    """Normalize known seeded values that were imported with bad characters."""
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(
+            """UPDATE Drivers
+               SET first_name=%s, last_name=%s
+               WHERE phone_number=%s
+                 AND (first_name<>%s OR last_name<>%s)""",
+            ("Rets'elisitsoe", "Tau", "+26658200002", "Rets'elisitsoe", "Tau")
+        )
+        cur.execute(
+            "UPDATE Admin_Users SET username=%s WHERE email=%s AND username<>%s",
+            ("admin", "admin@urbancab.co.ls", "admin")
+        )
+        cur.execute(
+            "UPDATE Admin_Users SET username=%s WHERE email=%s AND username<>%s",
+            ("superadmin", "superadmin@gmail.com", "superadmin")
+        )
+        mysql.connection.commit()
+        cur.close()
+    except Exception:
+        pass
+
+
+@app.before_request
+def run_startup_repairs():
+    if app.config.get('_seed_repairs_done'):
+        return
+    repair_seed_data()
+    app.config['_seed_repairs_done'] = True
 
 # ── DB helpers ────────────────────────────────────────────────
 def q(sql, args=(), one=False):
@@ -77,6 +110,70 @@ def call_proc(name, in_args=()):
         out_dict = {}
     return out_dict, rows
 def check_pw(p,h): return hash_pw(p) == h
+
+
+def pdf_safe(text):
+    """Convert text into a PDF-safe single line string."""
+    if text is None:
+        return ''
+    text = str(text).replace('\r', ' ').replace('\n', ' ')
+    text = (
+        text.replace('\u2018', "'")
+            .replace('\u2019', "'")
+            .replace('\u0060', "'")
+            .replace('\u00b4', "'")
+    )
+    return text.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+
+
+def build_simple_pdf(title, lines):
+    """Create a minimal one-page PDF with plain text content."""
+    commands = [
+        'BT',
+        '/F1 18 Tf',
+        '50 790 Td',
+        f'({pdf_safe(title)}) Tj',
+        '0 -26 Td',
+        '/F1 11 Tf'
+    ]
+
+    for raw_line in lines[:45]:
+        wrapped = textwrap.wrap(str(raw_line), width=92) or ['']
+        for part in wrapped:
+            commands.append(f'({pdf_safe(part)}) Tj')
+            commands.append('0 -15 Td')
+
+    commands.append('ET')
+    stream_text = '\n'.join(commands)
+    stream_bytes = stream_text.encode('latin-1', 'replace')
+
+    objects = []
+    objects.append(b'1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n')
+    objects.append(b'2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n')
+    objects.append(b'3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n')
+    objects.append(b'4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n')
+    objects.append(
+        f'5 0 obj << /Length {len(stream_bytes)} >> stream\n'.encode('ascii') +
+        stream_bytes +
+        b'\nendstream endobj\n'
+    )
+
+    pdf = b'%PDF-1.4\n'
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(pdf))
+        pdf += obj
+
+    xref_pos = len(pdf)
+    pdf += f'xref\n0 {len(offsets)}\n'.encode('ascii')
+    pdf += b'0000000000 65535 f \n'
+    for offset in offsets[1:]:
+        pdf += f'{offset:010d} 00000 n \n'.encode('ascii')
+    pdf += (
+        f'trailer << /Size {len(offsets)} /Root 1 0 R >>\n'
+        f'startxref\n{xref_pos}\n%%EOF'
+    ).encode('ascii')
+    return pdf
 
 # ── Validation ────────────────────────────────────────────────
 def val_phone(p): return bool(re.match(r'^\+?[0-9]{8,15}$', p.replace(' ','')))
@@ -138,14 +235,14 @@ def login():
             flash('Please enter your credentials.', 'danger')
             return render_template('login.html', role=role, ident=ident)
         if role == 'driver':
-            u = q("SELECT * FROM Drivers WHERE phone_number=%s", (ident,), one=True)
+            u = q("SELECT * FROM Drivers WHERE LOWER(first_name)=LOWER(%s)", (ident,), one=True)
             if u and check_pw(pw, u['password_hash']):
                 session.update({'uid': u['driver_id'], 'role': 'driver',
                                 'name': f"{u['first_name']} {u['last_name']}"})
                 flash(f"Welcome, {u['first_name']}!", 'success')
                 return redirect(url_for('driver_home'))
         elif role == 'admin':
-            u = q("SELECT * FROM Admin_Users WHERE username=%s OR email=%s", (ident, ident), one=True)
+            u = q("SELECT * FROM Admin_Users WHERE username=%s", (ident,), one=True)
             if u and check_pw(pw, u['password_hash']):
                 session.update({'uid':u['admin_id'], 'role':'admin', 'name':u['username']})
                 flash('Admin login successful.', 'success')
@@ -230,7 +327,7 @@ def driver_home():
     stats    = q("""SELECT COUNT(*) as total,
         SUM(CASE WHEN ride_status='COMPLETED' THEN 1 ELSE 0 END) as completed,
         COALESCE(SUM(fare_amount),0) as earned
-        FROM Rides WHERE driver_id=?""", (session['uid'],), one=True)
+        FROM Rides WHERE driver_id=%s""", (session['uid'],), one=True)
     return render_template('driver/home.html', driver=driver, pending=pending,
                            my_rides=my_rides, stats=stats)
 
@@ -311,11 +408,11 @@ def driver_history():
         JOIN Locations pu ON r.pickup_location_id=pu.location_id
         JOIN Locations dr ON r.dropoff_location_id=dr.location_id
         JOIN Payment_Methods pm ON r.payment_method_id=pm.payment_method_id
-        WHERE r.driver_id=? AND r.ride_status='COMPLETED'"""
+        WHERE r.driver_id=%s AND r.ride_status='COMPLETED'"""
     args = [session['uid']]
     if search:    sql += " AND (r.passenger_name LIKE %s OR r.passenger_phone LIKE %s)"; args += [f'%{search}%']*2
-    if date_from: sql += " AND DATE(r.completed_at)>=?"; args.append(date_from)
-    if date_to:   sql += " AND DATE(r.completed_at)<=?"; args.append(date_to)
+    if date_from: sql += " AND DATE(r.completed_at)>=%s"; args.append(date_from)
+    if date_to:   sql += " AND DATE(r.completed_at)<=%s"; args.append(date_to)
     sql += " ORDER BY r.completed_at DESC"
     rides = q(sql, args)
     total = sum(r['fare_amount'] or 0 for r in rides)
@@ -325,7 +422,7 @@ def driver_history():
 @app.route('/driver/profile', methods=['GET','POST'])
 @auth('driver')
 def driver_profile():
-    d = q("SELECT * FROM Drivers WHERE driver_id=?", (session['uid'],), one=True)
+    d = q("SELECT * FROM Drivers WHERE driver_id=%s", (session['uid'],), one=True)
     if request.method == 'POST':
         fn  = request.form.get('first_name','').strip()
         ln  = request.form.get('last_name','').strip()
@@ -343,10 +440,10 @@ def driver_profile():
             for e in errors: flash(e, 'danger')
             return render_template('driver/profile.html', d=d)
         if pw:
-            m("UPDATE Drivers SET first_name=?,last_name=?,vehicle_model=?,vehicle_plate=?,password_hash=? "
-              "WHERE driver_id=?", (fn, ln, vm, plt or d['vehicle_plate'], hash_pw(pw), session['uid']))
+            m("UPDATE Drivers SET first_name=%s,last_name=%s,vehicle_model=%s,vehicle_plate=%s,password_hash=%s "
+              "WHERE driver_id=%s", (fn, ln, vm, plt or d['vehicle_plate'], hash_pw(pw), session['uid']))
         else:
-            m("UPDATE Drivers SET first_name=?,last_name=?,vehicle_model=?,vehicle_plate=? WHERE driver_id=?",
+            m("UPDATE Drivers SET first_name=%s,last_name=%s,vehicle_model=%s,vehicle_plate=%s WHERE driver_id=%s",
               (fn, ln, vm, plt or d['vehicle_plate'], session['uid']))
         session['name'] = f"{fn} {ln}"
         flash('Profile updated successfully.', 'success')
@@ -388,12 +485,28 @@ def admin_rides():
     date_to   = request.args.get('date_to','')
     sql  = """SELECT * FROM vw_rides_full WHERE 1=1"""
     args = []
-    if search:    sql += " AND (r.passenger_name LIKE %s OR r.passenger_phone LIKE %s OR COALESCE(d.first_name||' '||d.last_name,'') LIKE %s OR pu.location_name LIKE %s OR dr.location_name LIKE %s)"; args += [f'%{search}%']*5
-    if status:    sql += " AND r.ride_status=?"; args.append(status)
-    if loc_id:    sql += " AND (r.pickup_location_id=? OR r.dropoff_location_id=?)"; args += [loc_id]*2
-    if date_from: sql += " AND DATE(r.requested_at)>=?"; args.append(date_from)
-    if date_to:   sql += " AND DATE(r.requested_at)<=?"; args.append(date_to)
-    sql += " ORDER BY r.requested_at DESC"
+    if search:
+        sql += """ AND (
+            passenger_name LIKE %s OR
+            passenger_phone LIKE %s OR
+            COALESCE(driver_name,'') LIKE %s OR
+            pickup_name LIKE %s OR
+            dropoff_name LIKE %s
+        )"""
+        args += [f'%{search}%'] * 5
+    if status:
+        sql += " AND ride_status=%s"
+        args.append(status)
+    if loc_id:
+        sql += " AND (pickup_location_id=%s OR dropoff_location_id=%s)"
+        args += [loc_id] * 2
+    if date_from:
+        sql += " AND DATE(requested_at)>=%s"
+        args.append(date_from)
+    if date_to:
+        sql += " AND DATE(requested_at)<=%s"
+        args.append(date_to)
+    sql += " ORDER BY requested_at DESC"
     rides     = q(sql, args)
     locations = q("SELECT * FROM Locations WHERE is_active=1 ORDER BY location_name")
     return render_template('admin/rides.html', rides=rides, locations=locations,
@@ -469,7 +582,7 @@ def admin_new_driver():
 @app.route('/admin/drivers/<int:did>/edit', methods=['GET','POST'])
 @auth('admin')
 def admin_edit_driver(did):
-    d = q("SELECT * FROM Drivers WHERE driver_id=?", (did,), one=True)
+    d = q("SELECT * FROM Drivers WHERE driver_id=%s", (did,), one=True)
     if not d:
         flash('Driver not found.', 'danger')
         return redirect(url_for('admin_drivers'))
@@ -493,13 +606,13 @@ def admin_edit_driver(did):
             for e in errors: flash(e, 'danger')
             return render_template('admin/driver_form.html', driver=d, form=request.form)
         if pw:
-            m("UPDATE Drivers SET first_name=?,last_name=?,phone_number=?,license_number=?,"
-              "vehicle_plate=?,vehicle_model=?,password_hash=? WHERE driver_id=?",
+            m("UPDATE Drivers SET first_name=%s,last_name=%s,phone_number=%s,license_number=%s,"
+              "vehicle_plate=%s,vehicle_model=%s,password_hash=%s WHERE driver_id=%s",
               (fn, ln, ph or d['phone_number'], lic or d['license_number'],
                plt or d['vehicle_plate'], vm, hash_pw(pw), did))
         else:
-            m("UPDATE Drivers SET first_name=?,last_name=?,phone_number=?,license_number=?,"
-              "vehicle_plate=?,vehicle_model=? WHERE driver_id=?",
+            m("UPDATE Drivers SET first_name=%s,last_name=%s,phone_number=%s,license_number=%s,"
+              "vehicle_plate=%s,vehicle_model=%s WHERE driver_id=%s",
               (fn, ln, ph or d['phone_number'], lic or d['license_number'],
                plt or d['vehicle_plate'], vm, did))
         flash(f'Driver {fn} {ln} updated.', 'success')
@@ -509,21 +622,140 @@ def admin_edit_driver(did):
 @app.route('/admin/drivers/<int:did>/toggle', methods=['POST'])
 @auth('admin')
 def admin_toggle_driver(did):
-    d = q("SELECT is_available FROM Drivers WHERE driver_id=?", (did,), one=True)
+    d = q("SELECT is_available FROM Drivers WHERE driver_id=%s", (did,), one=True)
     if d:
-        m("UPDATE Drivers SET is_available=? WHERE driver_id=?", (0 if d['is_available'] else 1, did))
+        m("UPDATE Drivers SET is_available=%s WHERE driver_id=%s", (0 if d['is_available'] else 1, did))
         flash('Driver availability updated.', 'info')
     return redirect(url_for('admin_drivers'))
+
+@app.route('/admin/admins', methods=['GET', 'POST'])
+@auth('admin')
+def admin_admins():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email    = request.form.get('email', '').strip().lower()
+        role     = request.form.get('role', 'admin').strip() or 'admin'
+        pw       = request.form.get('password', '')
+        pw2      = request.form.get('confirm_password', '')
+
+        errors = []
+        if len(username) < 3:
+            errors.append('Username must be at least 3 characters.')
+        if not email or not val_email(email):
+            errors.append('Enter a valid email address.')
+        if not pw or not val_pw(pw):
+            errors.append('Password must be at least 6 characters.')
+        if pw != pw2:
+            errors.append('Passwords do not match.')
+        if role not in ['admin', 'superadmin']:
+            errors.append('Invalid admin role selected.')
+
+        if errors:
+            for e in errors:
+                flash(e, 'danger')
+        else:
+            try:
+                m("INSERT INTO Admin_Users(username,email,password_hash,role) VALUES(%s,%s,%s,%s)",
+                  (username, email, hash_pw(pw), role))
+                flash(f'Admin account \"{username}\" created successfully.', 'success')
+                return redirect(url_for('admin_admins'))
+            except Exception:
+                flash('Username or email already exists.', 'danger')
+
+    search = request.args.get('q', '')
+    sql = """SELECT a.*,
+        COUNT(rr.report_id) AS report_count
+        FROM Admin_Users a
+        LEFT JOIN Ride_Reports rr ON rr.admin_id = a.admin_id
+        WHERE 1=1"""
+    args = []
+    if search:
+        sql += " AND (a.username LIKE %s OR a.email LIKE %s OR a.role LIKE %s)"
+        args += [f'%{search}%'] * 3
+    sql += " GROUP BY a.admin_id ORDER BY a.created_at DESC"
+    admins = q(sql, args)
+    return render_template('admin/admins.html', admins=admins, search=search)
+
+@app.route('/admin/admins/<int:aid>/edit', methods=['GET', 'POST'])
+@auth('admin')
+def admin_edit_admin(aid):
+    admin_user = q("SELECT * FROM Admin_Users WHERE admin_id=%s", (aid,), one=True)
+    if not admin_user:
+        flash('Admin user not found.', 'danger')
+        return redirect(url_for('admin_admins'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email    = request.form.get('email', '').strip().lower()
+        role     = request.form.get('role', 'admin').strip() or 'admin'
+        pw       = request.form.get('password', '')
+        pw2      = request.form.get('confirm_password', '')
+
+        errors = []
+        if len(username) < 3:
+            errors.append('Username must be at least 3 characters.')
+        if not email or not val_email(email):
+            errors.append('Enter a valid email address.')
+        if role not in ['admin', 'superadmin']:
+            errors.append('Invalid admin role selected.')
+        if pw and not val_pw(pw):
+            errors.append('Password must be at least 6 characters.')
+        if pw and pw != pw2:
+            errors.append('Passwords do not match.')
+
+        if errors:
+            for e in errors:
+                flash(e, 'danger')
+            return render_template('admin/admin_form.html', admin_user=admin_user, form=request.form)
+
+        try:
+            if pw:
+                m("UPDATE Admin_Users SET username=%s,email=%s,role=%s,password_hash=%s WHERE admin_id=%s",
+                  (username, email, role, hash_pw(pw), aid))
+            else:
+                m("UPDATE Admin_Users SET username=%s,email=%s,role=%s WHERE admin_id=%s",
+                  (username, email, role, aid))
+
+            if aid == session.get('uid'):
+                session['name'] = username
+
+            flash(f'Admin account "{username}" updated.', 'success')
+            return redirect(url_for('admin_admins'))
+        except Exception:
+            flash('Username or email already exists.', 'danger')
+
+    return render_template('admin/admin_form.html', admin_user=admin_user, form=dict(admin_user))
+
+@app.route('/admin/admins/<int:aid>/delete', methods=['POST'])
+@auth('admin')
+def admin_delete_admin(aid):
+    if aid == session.get('uid'):
+        flash('You cannot delete your own admin account while logged in.', 'danger')
+        return redirect(url_for('admin_admins'))
+
+    target = q("SELECT admin_id, username FROM Admin_Users WHERE admin_id=%s", (aid,), one=True)
+    if not target:
+        flash('Admin user not found.', 'danger')
+        return redirect(url_for('admin_admins'))
+
+    reports = q("SELECT COUNT(*) as c FROM Ride_Reports WHERE admin_id=%s", (aid,), one=True)
+    if reports and reports['c'] > 0:
+        flash('Cannot delete an admin who has generated reports.', 'danger')
+        return redirect(url_for('admin_admins'))
+
+    m("DELETE FROM Admin_Users WHERE admin_id=%s", (aid,))
+    flash(f'Admin account "{target["username"]}" deleted.', 'info')
+    return redirect(url_for('admin_admins'))
 
 @app.route('/admin/drivers/<int:did>/delete', methods=['POST'])
 @auth('admin')
 def admin_delete_driver(did):
-    active = q("SELECT COUNT(*) as c FROM Rides WHERE driver_id=? AND ride_status IN ('ACCEPTED','IN_PROGRESS')",
+    active = q("SELECT COUNT(*) as c FROM Rides WHERE driver_id=%s AND ride_status IN ('ACCEPTED','IN_PROGRESS')",
                (did,), one=True)
     if active['c'] > 0:
         flash('Cannot delete a driver with active rides.', 'danger')
     else:
-        m("DELETE FROM Drivers WHERE driver_id=?", (did,))
+        m("DELETE FROM Drivers WHERE driver_id=%s", (did,))
         flash('Driver removed.', 'info')
     return redirect(url_for('admin_drivers'))
 
@@ -550,8 +782,8 @@ def admin_locations():
         (SELECT COUNT(*) FROM Rides WHERE pickup_location_id=l.location_id OR dropoff_location_id=l.location_id) as ride_count
         FROM Locations l WHERE 1=1"""
     args   = []
-    if search: sql += " AND l.location_name LIKE ?"; args.append(f'%{search}%')
-    if zone:   sql += " AND l.area_zone=?"; args.append(zone)
+    if search: sql += " AND l.location_name LIKE %s"; args.append(f'%{search}%')
+    if zone:   sql += " AND l.area_zone=%s"; args.append(zone)
     sql += " ORDER BY l.area_zone, l.location_name"
     locations = q(sql, args)
     return render_template('admin/locations.html', locations=locations, search=search, zone=zone)
@@ -570,7 +802,7 @@ def admin_edit_location(lid):
         if len(name) < 3:
             flash('Location name must be at least 3 characters.', 'danger')
         else:
-            m("UPDATE Locations SET location_name=?,area_zone=?,description=? WHERE location_id=?",
+            m("UPDATE Locations SET location_name=%s,area_zone=%s,description=%s WHERE location_id=%s",
               (name, zone, desc, lid))
             flash(f'Location updated to "{name}".', 'success')
             return redirect(url_for('admin_locations'))
@@ -579,9 +811,9 @@ def admin_edit_location(lid):
 @app.route('/admin/locations/<int:lid>/toggle', methods=['POST'])
 @auth('admin')
 def admin_toggle_location(lid):
-    loc = q("SELECT is_active FROM Locations WHERE location_id=?", (lid,), one=True)
+    loc = q("SELECT is_active FROM Locations WHERE location_id=%s", (lid,), one=True)
     if loc:
-        m("UPDATE Locations SET is_active=? WHERE location_id=?", (0 if loc['is_active'] else 1, lid))
+        m("UPDATE Locations SET is_active=%s WHERE location_id=%s", (0 if loc['is_active'] else 1, lid))
         flash('Location status updated.', 'info')
     return redirect(url_for('admin_locations'))
 
@@ -599,10 +831,10 @@ def admin_reports():
             flash('Please select a report date.', 'danger')
         else:
             totals = q("SELECT COUNT(*) as c, COALESCE(SUM(fare_amount),0) as rev "
-                       "FROM Rides WHERE DATE(requested_at)=? AND ride_status='COMPLETED'",
+                       "FROM Rides WHERE DATE(requested_at)=%s AND ride_status='COMPLETED'",
                        (rdate,), one=True)
             if not lid:
-                top = q("SELECT pickup_location_id FROM Rides WHERE DATE(requested_at)=? "
+                top = q("SELECT pickup_location_id FROM Rides WHERE DATE(requested_at)=%s "
                         "GROUP BY pickup_location_id ORDER BY COUNT(*) DESC LIMIT 1", (rdate,), one=True)
                 lid = top['pickup_location_id'] if top else None
             m("INSERT INTO Ride_Reports(admin_id,report_type,report_date,total_rides,total_revenue,"
@@ -618,7 +850,7 @@ def admin_reports():
         LEFT JOIN Locations l ON rr.top_location_id=l.location_id WHERE 1=1"""
     args = []
     if search:      sql += " AND (rr.report_type LIKE %s OR rr.notes LIKE %s)"; args += [f'%{search}%']*2
-    if type_filter: sql += " AND rr.report_type=?"; args.append(type_filter)
+    if type_filter: sql += " AND rr.report_type=%s"; args.append(type_filter)
     sql += " ORDER BY rr.generated_at DESC"
     reports   = q(sql, args)
     daily     = q("SELECT ride_date AS day, total_rides AS rides, revenue FROM vw_daily_revenue ORDER BY ride_date DESC LIMIT 14")
@@ -630,9 +862,65 @@ def admin_reports():
 @app.route('/admin/reports/<int:rid>/delete', methods=['POST'])
 @auth('admin')
 def admin_delete_report(rid):
-    m("DELETE FROM Ride_Reports WHERE report_id=?", (rid,))
+    m("DELETE FROM Ride_Reports WHERE report_id=%s", (rid,))
     flash('Report deleted.', 'info')
     return redirect(url_for('admin_reports'))
+
+
+@app.route('/admin/reports/<int:rid>/pdf')
+@auth('admin')
+def admin_report_pdf(rid):
+    report = q("""SELECT rr.*, a.username, l.location_name AS top_location_name
+                  FROM Ride_Reports rr
+                  JOIN Admin_Users a ON rr.admin_id = a.admin_id
+                  LEFT JOIN Locations l ON rr.top_location_id = l.location_id
+                  WHERE rr.report_id=%s""", (rid,), one=True)
+    if not report:
+        flash('Report not found.', 'danger')
+        return redirect(url_for('admin_reports'))
+
+    rides = q("""SELECT passenger_name, passenger_phone, pickup_name, dropoff_name,
+                        COALESCE(driver_name, 'Unassigned') AS driver_name,
+                        ride_status, fare_amount
+                 FROM vw_rides_full
+                 WHERE DATE(requested_at)=%s
+                 ORDER BY requested_at DESC
+                 LIMIT 20""", (report['report_date'],))
+
+    lines = [
+        f"Report type: {report['report_type']}",
+        f"Report date: {report['report_date']}",
+        f"Generated at: {report['generated_at'].strftime('%Y-%m-%d %H:%M') if report['generated_at'] else ''}",
+        f"Prepared by: {report['username']}",
+        f"Total rides: {report['total_rides']}",
+        f"Total revenue: M {float(report['total_revenue'] or 0):.2f}",
+        f"Top location: {report['top_location_name'] or 'None'}",
+        f"Notes: {report['notes'] or 'None'}",
+        "",
+        "Ride details (up to 20 records for the report date):"
+    ]
+
+    if rides:
+        for idx, ride in enumerate(rides, start=1):
+            lines.append(
+                f"{idx}. {ride['passenger_name']} | {ride['pickup_name']} -> {ride['dropoff_name']} | "
+                f"Driver: {ride['driver_name']} | Status: {ride['ride_status']} | "
+                f"Fare: M {float(ride['fare_amount'] or 0):.2f}"
+            )
+    else:
+        lines.append("No ride records found for this report date.")
+
+    pdf_bytes = build_simple_pdf(
+        f"Lipalangoang Report #{report['report_id']}",
+        lines
+    )
+    safe_type = re.sub(r'[^A-Za-z0-9]+', '_', report['report_type']).strip('_') or 'report'
+    filename = f"{safe_type}_{report['report_date']}_report_{report['report_id']}.pdf"
+
+    response = make_response(pdf_bytes)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=\"{filename}\"'
+    return response
 
 @app.route('/api/fare')
 def api_fare():

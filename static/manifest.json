@@ -9,7 +9,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0c0d12",
-  "theme_color": "#0b1f5f",
+  "theme_color": "#2f5bdb",
   "categories": ["travel", "transportation", "productivity"],
   "icons": [
     {
